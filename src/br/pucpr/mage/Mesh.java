@@ -16,11 +16,10 @@ import static org.lwjgl.opengl.GL30.glGenVertexArrays;
  */
 public class Mesh {
     private int id;
-    private Shader shader;
     private IndexBuffer indexBuffer;
 
     private Map<String, ArrayBuffer> attributes = new HashMap<>();
-    private Map<String, Uniform> uniforms = new HashMap<>();
+    private Map<String, Object> uniforms = new HashMap<>();
 
     private boolean wireframe = false;
 
@@ -33,35 +32,6 @@ public class Mesh {
      */
     public int getId() {
         return id;
-    }
-
-    /**
-     * Define o index buffer da malha. Esse método não pode ser chamado diretamente. Utilize os métodos de index buffer
-     * da classe MeshBuilder para isso.
-     * @param indexBuffer O index buffer a ser definido.
-     * @return A própria malha
-     * @see MeshBuilder#setIndexBuffer(IndexBuffer)
-     */
-    Mesh setIndexBuffer(IndexBuffer indexBuffer) {
-        this.indexBuffer = indexBuffer;
-        return this;
-    }
-
-    /**
-     * Altera o shader a ser utilizado no desenho da malha.
-     * @param shader O shader a ser usado no desenho
-     * @return A própria malha
-     */
-    public Mesh setShader(Shader shader) {
-        this.shader = shader;
-        return this;
-    }
-
-    /**
-     * @return O shader associado a malha.
-     */
-    public Shader getShader() {
-        return shader;
     }
 
     /**
@@ -81,16 +51,36 @@ public class Mesh {
     }
 
     /**
+     * @param name Nome do atributo
+     * @return verdadeiro se o atributo indicado existe.
+     */
+    public boolean hasAttribute(String name) {
+        return attributes.containsKey(name);
+    }
+
+    /**
+     * Define o index buffer da malha. Esse método não pode ser chamado diretamente. Utilize os métodos de index buffer
+     * da classe MeshBuilder para isso.
+     * @param indexBuffer O index buffer a ser definido.
+     * @return A própria malha
+     * @see MeshBuilder#setIndexBuffer(IndexBuffer)
+     */
+    Mesh setIndexBuffer(IndexBuffer indexBuffer) {
+        this.indexBuffer = indexBuffer;
+        return this;
+    }
+
+    /**
      * Define o valor de um uniforme dentro da malha
      * @param name Nome do uniforme
      * @param value valor a ser definido
      * @return A própria malha
      */
-    private Mesh setUniform(String name, UniformType type, Object value) {
+    private Mesh setUniformObject(String name, Object value) {
         if (value == null)
             uniforms.remove(name);
         else {
-            uniforms.put(name, new Uniform(type, value));
+            uniforms.put(name, value);
         }
         return this;
     }
@@ -102,7 +92,7 @@ public class Mesh {
      * @return A própria malha
      */
     public Mesh setUniform(String name, Matrix3f matrix) {
-        return setUniform(name, UniformType.Matrix3f, matrix);
+        return setUniformObject(name, matrix);
     }
 
     /**
@@ -112,7 +102,7 @@ public class Mesh {
      * @return A própria malha
      */
     public Mesh setUniform(String name, Matrix4f matrix) {
-        return setUniform(name, UniformType.Matrix4f, matrix);
+        return setUniformObject(name, matrix);
     }
 
     /**
@@ -122,7 +112,7 @@ public class Mesh {
      * @return A própria malha
      */
     public Mesh setUniform(String name, Vector2f vector) {
-        return setUniform(name, UniformType.Vector2f, vector);
+        return setUniformObject(name, vector);
     }
 
     /**
@@ -132,7 +122,7 @@ public class Mesh {
      * @return A própria malha
      */
     public Mesh setUniform(String name, Vector3f vector) {
-        return setUniform(name, UniformType.Vector3f, vector);
+        return setUniformObject(name, vector);
     }
     /**
      * Define o valor de um uniforme dentro da malha
@@ -141,7 +131,7 @@ public class Mesh {
      * @return A própria malha
      */
     public Mesh setUniform(String name, Vector4f vector) {
-        return setUniform(name, UniformType.Vector4f, vector);
+        return setUniformObject(name, vector);
     }
 
     /**
@@ -151,7 +141,7 @@ public class Mesh {
      * @return A própria malha
      */
     public Mesh setUniform(String name, float value) {
-        return setUniform(name, UniformType.Float, value);
+        return setUniformObject(name, value);
     }
 
     /**
@@ -161,7 +151,7 @@ public class Mesh {
      * @return A própria malha
      */
     public Mesh setUniform(String name, int value) {
-        return setUniform(name, UniformType.Integer, value);
+        return setUniformObject(name, value);
     }
 
     /**
@@ -171,7 +161,17 @@ public class Mesh {
      * @return A própria malha
      */
     public Mesh setUniform(String name, boolean value) {
-        return setUniform(name, UniformType.Boolean, value);
+        return setUniformObject(name, value);
+    }
+
+    /**
+     * Define o valor de um shader item dentro da malha
+     * @param name Nome do item
+     * @param item item a ser definido
+     * @return A própria malha
+     */
+    public Mesh setItem(String name, ShaderItem item) {
+        return setUniformObject(name, item);
     }
 
     /**
@@ -190,13 +190,12 @@ public class Mesh {
     public boolean isWireframe() {
         return wireframe;
     }
-
     /**
      * Desenha a malha.
      * @return A própria mesh
      */
-    public Mesh draw() {
-        if (shader == null || attributes.size() == 0) {
+    public Mesh draw(Shader shader) {
+        if (shader == null) {
             return this;
         }
 
@@ -208,18 +207,9 @@ public class Mesh {
         //E qual shader program irá ser usado durante o desenho
         shader.bind();
 
-        //Associação dos ArrayBuffers de atributos (value) as suas variáveis no shader (key)
-        //----------------------------------------------------------------------------------
-        for (Map.Entry<String, ArrayBuffer> attribute : attributes.entrySet()) {
-            ArrayBuffer buffer = attribute.getValue();
-            shader.setAttribute(attribute.getKey(), buffer);
-        }
-
         //Associação dos uniforms (value) as suas variáveis no shader (key)
         //---------------------------------------------------
-        for (Map.Entry<String, Uniform> entry : uniforms.entrySet()) {
-            entry.getValue().set(shader, entry.getKey());
-        }
+        uniforms.forEach(shader::setUniformObject);
 
         if (indexBuffer == null) {
             //Se não houver index buffer, busca pelo primeiro ArrayBuffer e desenha com ele.
@@ -230,11 +220,16 @@ public class Mesh {
         }
 
         // Faxina
-        for (String attribute : attributes.keySet()) {
-            shader.setAttribute(attribute, null);
-        }
         shader.unbind();
         glBindVertexArray(0);
+        return this;
+    }
+
+    Mesh unbindAll() {
+        glBindVertexArray(0);
+
+        attributes.values().forEach(ArrayBuffer::unbind);
+        if (indexBuffer != null) indexBuffer.unbind();
         return this;
     }
 }
