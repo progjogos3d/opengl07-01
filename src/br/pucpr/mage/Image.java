@@ -37,7 +37,7 @@ public class Image {
                 }
             }
         } else {
-            try (var source = getClass().getResourceAsStream(resource);
+            try (var source = getClass().getResourceAsStream("/br/pucpr/resource/" + resource);
                     var rbc = Channels.newChannel(source)) {
                 buffer = BufferUtils.createByteBuffer(8 * 1024);
 
@@ -72,7 +72,7 @@ public class Image {
             width = w.get();
             height = h.get();
             channels = c.get();
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new RuntimeException("Failed to load image: " + path, e);
         }
     }
